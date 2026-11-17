@@ -1,0 +1,102 @@
+project:
+  name: "AQI-24h-Forecasting-ES678"
+  description: "24-Hour Ahead Hourly Air Quality Index (AQI) Forecasting under Extreme Pollution Events"
+  random_seed: 42
+
+station:
+  name: "Anand_Vihar_Delhi"
+  station_id: "DEL_AV_001"
+  latitude: 28.6508
+  longitude: 77.3152
+
+problem:
+  target_variable: "AQI"
+  prediction_horizon: 24   # hours ahead (direct forecasting of y_{t+24})
+  lookback_window: 72       # hours of historical context (t-71, ..., t)
+  sampling_frequency: "1h"
+  unit: "dimensionless index (0-500 scale, CPCB / EPA standard)"
+
+features:
+  pollutants:
+    - "PM2.5"
+    - "PM10"
+    - "NO2"
+    - "SO2"
+    - "CO"
+    - "O3"
+  meteorology:
+    - "Temperature"
+    - "Relative_Humidity"
+    - "Wind_Speed"
+    - "Wind_Direction"
+    - "Pressure"
+  calendar:
+    - "hour"
+    - "dayofweek"
+    - "month"
+    - "dayofyear"
+  cyclical_encodings:
+    hour: 24
+    month: 12
+    dayofweek: 7
+    wind_direction: 360
+
+preprocessing:
+  max_imputation_gap_hours: 6   # Maximum consecutive NaN hours allowed for forward-fill / bounded spline interpolation
+  scaler_type: "robust"         # 'robust' (resistant to extreme outliers) or 'standard'
+  target_scaler: "standard"
+
+data_split:
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  walk_forward_folds: 5
+
+models:
+  baselines:
+    persistence_lag: 24         # y_hat_{t+24} = y_t
+    seasonal_persistence_lag: 24
+    seasonal_weekly_lag: 168
+  tree_models:
+    lgbm:
+      n_estimators: 300
+      learning_rate: 0.03
+      num_leaves: 31
+      max_depth: 6
+      subsample: 0.8
+      colsample_bytree: 0.8
+      random_state: 42
+    xgboost:
+      n_estimators: 300
+      learning_rate: 0.03
+      max_depth: 6
+      subsample: 0.8
+      colsample_bytree: 0.8
+      random_state: 42
+  deep_models:
+    hidden_dim: 128
+    num_layers: 2
+    dropout: 0.2
+    learning_rate: 0.001
+    batch_size: 64
+    epochs: 40
+    early_stopping_patience: 8
+
+evaluation:
+  metrics:
+    - "RMSE"
+    - "MAE"
+    - "MAPE"
+    - "R2"
+    - "Pearson_r"
+  extreme_slices:
+    moderate: [101, 200]
+    poor: [201, 300]
+    very_poor: [301, 400]
+    severe: [401, 500]
+    extreme_threshold: 300.0    # Evaluate performance for actual AQI > 300
+
+depth_component:
+  quantiles: [0.10, 0.50, 0.90] # Quantile regression for uncertainty quantification
+  stagnant_wind_threshold: 1.0   # Wind speed < 1.0 m/s indicating atmospheric stagnation
+  inversion_temp_drop: 5.0       # Diurnal thermal inversion indicator

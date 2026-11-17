@@ -1,0 +1,17 @@
+\begin{table}
+\caption{Comparative 24-hour ahead AQI forecasting performance across overall test timeline and extreme pollution episodes ($AQI > 300$).}
+\label{tab:main_benchmark}
+\begin{tabular}{lrrrrrrrr}
+\toprule
+ & Overall_RMSE & Overall_MAE & Overall_R2 & Overall_Pearson_r & Overall_Willmott_d & Extreme_AQI>300_RMSE & Extreme_AQI>300_MAE & Extreme_AQI>300_Pearson_r \\
+Model &  &  &  &  &  &  &  &  \\
+\midrule
+Persistence (t) & 51.480000 & 36.740000 & 0.830000 & 0.920000 & 0.960000 & 47.070000 & 32.420000 & 0.800000 \\
+Seasonal Weekly & 67.560000 & 50.300000 & 0.710000 & 0.880000 & 0.930000 & 69.760000 & 51.150000 & 0.640000 \\
+LightGBM & 38.900000 & 28.950000 & 0.910000 & 0.950000 & 0.970000 & 34.720000 & 25.970000 & 0.870000 \\
+XGBoost & 39.230000 & 29.140000 & 0.900000 & 0.950000 & 0.970000 & 35.070000 & 26.230000 & 0.870000 \\
+Attention-LSTM & 45.210000 & 35.420000 & 0.870000 & 0.940000 & 0.960000 & 41.790000 & 33.040000 & 0.870000 \\
+Transformer & 44.590000 & 33.440000 & 0.880000 & 0.950000 & 0.970000 & 42.350000 & 31.750000 & 0.870000 \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ES 678: 24-Hour Ahead Hourly AQI Forecasting Dashboard</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --severe: #ef4444;
+      --poor: #f97316;
+      --mod: #eab308;
+      --good: #22c55e;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+  <!-- Header -->
+  <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-700 pb-6">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-500/20 text-sky-400 border border-sky-500/30">ES 678 Course Project</span>
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Anand Vihar, Delhi (DEL_AV_001)</span>
+      </div>
+      <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-white">24-Hour Ahead Hourly Air Quality Index (AQI) Forecaster</h1>
+      <p class="text-sm text-slate-400 mt-1">Multi-Model Benchmark, Phase-Lag Error Auditing & Calibrated Uncertainty Quantification</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="bg-slate-800/80 border border-slate-700 rounded-lg px-4 py-2 text-right">
+        <div class="text-xs text-slate-400">Prediction Horizon</div>
+        <div class="text-lg font-bold text-sky-400">t + 24 Hours</div>
+      </div>
+      <div class="bg-slate-800/80 border border-slate-700 rounded-lg px-4 py-2 text-right">
+        <div class="text-xs text-slate-400">Historical Lookback</div>
+        <div class="text-lg font-bold text-emerald-400">72 Hours (3 Days)</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto space-y-8">
+
+    <!-- KPI Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 shadow-lg">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Top Overall Model</div>
+        <div class="text-2xl font-bold text-sky-400 mt-1">LightGBM</div>
+        <div class="text-xs text-slate-300 mt-1">RMSE: <strong class="text-white">38.90</strong> | R²: <strong class="text-white">0.910</strong></div>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 shadow-lg">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Extreme Slice (AQI > 300)</div>
+        <div class="text-2xl font-bold text-amber-400 mt-1">34.72 RMSE</div>
+        <div class="text-xs text-slate-300 mt-1">MAE: <strong class="text-white">25.97</strong> | Pearson r: <strong class="text-white">0.870</strong></div>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 shadow-lg">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Phase Lag Delay</div>
+        <div class="text-2xl font-bold text-emerald-400 mt-1">0 Hours</div>
+        <div class="text-xs text-slate-300 mt-1">Synchronized (Persistence lag = <span class="text-rose-400">+24h</span>)</div>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 shadow-lg">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">80% UQ Coverage (PICP)</div>
+        <div class="text-2xl font-bold text-purple-400 mt-1">70.47%</div>
+        <div class="text-xs text-slate-300 mt-1">Mean Interval Width: <strong class="text-white">88.56</strong> pts</div>
+      </div>
+    </div>
+
+    <!-- Interactive Interactive Chart & Model Selector -->
+    <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-5 shadow-xl">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+        <div>
+          <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+            <span>Dynamic 24-Hour Forecast vs Ground Truth</span>
+            <span class="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded">Severe Smog & Stagnation Episode</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Interactive sequence simulation with 80% Prediction Interval (P10 to P90 bounds).</p>
+        </div>
+
+        <!-- Model Switcher Buttons -->
+        <div class="flex flex-wrap gap-1 bg-slate-900/80 p-1 rounded-lg border border-slate-700/60 text-xs">
+          <button onclick="selectModel('lightgbm')" id="btn-lightgbm" class="px-3 py-1.5 rounded-md font-medium transition bg-sky-500 text-white shadow">LightGBM</button>
+          <button onclick="selectModel('xgboost')" id="btn-xgboost" class="px-3 py-1.5 rounded-md font-medium transition text-slate-400 hover:text-white">XGBoost</button>
+          <button onclick="selectModel('lstm')" id="btn-lstm" class="px-3 py-1.5 rounded-md font-medium transition text-slate-400 hover:text-white">Attention-LSTM</button>
+          <button onclick="selectModel('transformer')" id="btn-transformer" class="px-3 py-1.5 rounded-md font-medium transition text-slate-400 hover:text-white">Transformer</button>
+          <button onclick="selectModel('persistence')" id="btn-persistence" class="px-3 py-1.5 rounded-md font-medium transition text-slate-400 hover:text-white">Pure Persistence</button>
+          <button onclick="selectModel('weekly')" id="btn-weekly" class="px-3 py-1.5 rounded-md font-medium transition text-slate-400 hover:text-white">Weekly Baseline</button>
+        </div>
+      </div>
+
+      <!-- Canvas Chart -->
+      <div class="relative w-full h-80 bg-slate-950/60 rounded-lg p-2 border border-slate-800">
+        <canvas id="forecastCanvas" class="w-full h-full block"></canvas>
+      </div>
+
+      <!-- Legend & Active Metrics -->
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-4 text-xs pt-3 border-t border-slate-700/60">
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-full bg-slate-200 inline-block"></span>
+            <span class="text-slate-300">Ground Truth AQI ($y_{t+24}$)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span id="legendModelColor" class="w-3 h-3 rounded-full bg-sky-400 inline-block"></span>
+            <span id="legendModelName" class="text-slate-300 font-semibold">Model Forecast ($\hat{y}_{t+24}$)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded bg-purple-500/30 border border-purple-400 inline-block"></span>
+            <span class="text-slate-300">80% Prediction Interval ($P_{10} - P_{90}$)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-0.5 bg-rose-500 inline-block"></span>
+            <span class="text-slate-400">Severe Threshold (300)</span>
+          </div>
+        </div>
+
+        <div id="modelScorecard" class="flex items-center gap-3 bg-slate-900/60 px-3 py-1.5 rounded border border-slate-700 text-slate-300">
+          <!-- Injected dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Two-Column Layout: Diagnostic Auditing & CPCB Interactive Calculator -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+      <!-- Column 1: Model Benchmark Leaderboard & Stagnation Audit -->
+      <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-5 shadow-xl flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-semibold text-white">Full Model Benchmark Matrix</h3>
+            <span class="text-xs text-slate-400">2,628 Test Hours (Autumn/Winter)</span>
+          </div>
+
+          <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-900/80 text-slate-400 uppercase font-medium border-b border-slate-700">
+                <tr>
+                  <th class="py-2.5 px-3">Model</th>
+                  <th class="py-2.5 px-2">Overall RMSE</th>
+                  <th class="py-2.5 px-2">Overall MAE</th>
+                  <th class="py-2.5 px-2">R²</th>
+                  <th class="py-2.5 px-2 text-amber-400">Extreme RMSE</th>
+                  <th class="py-2.5 px-2">Opt Lag</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-700/60 text-slate-200">
+                <tr class="bg-sky-500/10 font-medium">
+                  <td class="py-2.5 px-3 text-sky-400 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span> LightGBM
+                  </td>
+                  <td class="py-2.5 px-2 font-bold text-white">38.90</td>
+                  <td class="py-2.5 px-2">28.95</td>
+                  <td class="py-2.5 px-2">0.91</td>
+                  <td class="py-2.5 px-2 font-bold text-amber-300">34.72</td>
+                  <td class="py-2.5 px-2 text-emerald-400 font-bold">0 h</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-3">XGBoost</td>
+                  <td class="py-2 px-2">39.23</td>
+                  <td class="py-2 px-2">29.14</td>
+                  <td class="py-2 px-2">0.90</td>
+                  <td class="py-2 px-2">35.07</td>
+                  <td class="py-2 px-2 text-emerald-400">0 h</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-3">Transformer</td>
+                  <td class="py-2 px-2">44.59</td>
+                  <td class="py-2 px-2">33.44</td>
+                  <td class="py-2 px-2">0.88</td>
+                  <td class="py-2 px-2">42.35</td>
+                  <td class="py-2 px-2 text-emerald-400">0 h</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-3">Attention-LSTM</td>
+                  <td class="py-2 px-2">45.21</td>
+                  <td class="py-2 px-2">35.42</td>
+                  <td class="py-2 px-2">0.87</td>
+                  <td class="py-2 px-2">41.79</td>
+                  <td class="py-2 px-2 text-emerald-400">0 h</td>
+                </tr>
+                <tr class="text-slate-400">
+                  <td class="py-2 px-3">Pure Persistence ($y_t$)</td>
+                  <td class="py-2 px-2">51.48</td>
+                  <td class="py-2 px-2">36.74</td>
+                  <td class="py-2 px-2">0.83</td>
+                  <td class="py-2 px-2">47.07</td>
+                  <td class="py-2 px-2 text-rose-400 font-bold">+24 h</td>
+                </tr>
+                <tr class="text-slate-400">
+                  <td class="py-2 px-3">Seasonal Weekly</td>
+                  <td class="py-2 px-2">67.56</td>
+                  <td class="py-2 px-2">50.30</td>
+                  <td class="py-2 px-2">0.71</td>
+                  <td class="py-2 px-2">69.76</td>
+                  <td class="py-2 px-2">0 h</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Atmospheric Failure Audit Callout -->
+        <div class="mt-4 p-3.5 bg-slate-900/70 border border-slate-700/80 rounded-lg">
+          <div class="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-1">Atmospheric Boundary Layer Audit</div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Under <strong>stagnant conditions ($WS < 1.0\text{ m/s}$)</strong>, model MAE degrades to <strong class="text-rose-400">44.91</strong> with a negative bias of <strong>-31.54</strong> (actual > predicted). Without vertical boundary-layer profiles, models systematically underpredict thermal inversion trapping.
+          </p>
+        </div>
+      </div>
+
+      <!-- Column 2: Interactive CPCB AQI Breakpoint Simulator -->
+      <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-5 shadow-xl">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h3 class="text-base font-semibold text-white">Live CPCB Sub-Index Calculator</h3>
+            <p class="text-xs text-slate-400">Adjust concentrations to compute official Indian NAQI sub-indices.</p>
+          </div>
+          <div id="aqiBadge" class="px-3 py-1.5 rounded-lg text-center font-bold text-sm bg-rose-600 text-white shadow">
+            AQI: <span id="aqiTotalVal">342</span>
+            <div id="aqiCategoryVal" class="text-[10px] font-normal uppercase tracking-wider">Very Poor</div>
+          </div>
+        </div>
+
+        <div class="space-y-3.5 text-xs">
+          <!-- PM2.5 -->
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>PM2.5 (Fine Particulate)</span>
+              <span class="font-mono text-sky-400"><strong id="val-pm25">145</strong> µg/m³ (<span id="sub-pm25">319</span> SI)</span>
+            </div>
+            <input type="range" id="slider-pm25" min="5" max="450" value="145" class="w-full accent-sky-400 cursor-pointer" oninput="updateAQI()">
+          </div>
+
+          <!-- PM10 -->
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>PM10 (Coarse Particulate)</span>
+              <span class="font-mono text-sky-400"><strong id="val-pm10">290</strong> µg/m³ (<span id="sub-pm10">240</span> SI)</span>
+            </div>
+            <input type="range" id="slider-pm10" min="10" max="600" value="290" class="w-full accent-sky-400 cursor-pointer" oninput="updateAQI()">
+          </div>
+
+          <!-- NO2 -->
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>NO2 (Nitrogen Dioxide)</span>
+              <span class="font-mono text-sky-400"><strong id="val-no2">85</strong> µg/m³ (<span id="sub-no2">105</span> SI)</span>
+            </div>
+            <input type="range" id="slider-no2" min="5" max="350" value="85" class="w-full accent-sky-400 cursor-pointer" oninput="updateAQI()">
+          </div>
+
+          <!-- CO -->
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>CO (Carbon Monoxide)</span>
+              <span class="font-mono text-sky-400"><strong id="val-co">2.8</strong> mg/m³ (<span id="sub-co">110</span> SI)</span>
+            </div>
+            <input type="range" id="slider-co" min="0.2" max="25" step="0.1" value="2.8" class="w-full accent-sky-400 cursor-pointer" oninput="updateAQI()">
+          </div>
+
+          <!-- O3 -->
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>O3 (Ozone)</span>
+              <span class="font-mono text-sky-400"><strong id="val-o3">42</strong> µg/m³ (<span id="sub-o3">42</span> SI)</span>
+            </div>
+            <input type="range" id="slider-o3" min="5" max="250" value="42" class="w-full accent-sky-400 cursor-pointer" oninput="updateAQI()">
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Responsible Pollutant: <strong id="dominantPollutant" class="text-sky-300">PM2.5</strong></span>
+          <span>Standard: CPCB NAQI (India)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visual Diagnostic Dashboards Section -->
+    <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-5 shadow-xl">
+      <h3 class="text-base font-semibold text-white mb-2">High-Resolution Diagnostic Report Figures</h3>
+      <p class="text-xs text-slate-400 mb-4">Generated during pipeline execution and saved in <code class="bg-slate-900 px-1 py-0.5 rounded text-sky-300">reports/figures/</code>.</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- LightGBM Dashboard -->
+        <a href="reports/figures/error_dashboard_lightgbm.png" target="_blank" class="group block bg-slate-900/80 border border-slate-700 hover:border-sky-500 rounded-lg p-3 transition">
+          <div class="aspect-video bg-slate-950 rounded overflow-hidden mb-2 relative">
+            <img src="reports/figures/error_dashboard_lightgbm.png" alt="LightGBM Error Dashboard" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+          </div>
+          <div class="text-xs font-semibold text-white group-hover:text-sky-400">LightGBM Error Dashboard</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Parity Plot, Residuals, CCF Phase Lag</div>
+        </a>
+
+        <!-- Attention-LSTM Dashboard -->
+        <a href="reports/figures/error_dashboard_attention-lstm.png" target="_blank" class="group block bg-slate-900/80 border border-slate-700 hover:border-sky-500 rounded-lg p-3 transition">
+          <div class="aspect-video bg-slate-950 rounded overflow-hidden mb-2 relative">
+            <img src="reports/figures/error_dashboard_attention-lstm.png" alt="Attention-LSTM Error Dashboard" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+          </div>
+          <div class="text-xs font-semibold text-white group-hover:text-sky-400">Attention-LSTM Dashboard</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Temporal Attention Weights & Residuals</div>
+        </a>
+
+        <!-- Quantile Prediction Intervals -->
+        <a href="reports/figures/quantile_prediction_intervals.png" target="_blank" class="group block bg-slate-900/80 border border-slate-700 hover:border-sky-500 rounded-lg p-3 transition">
+          <div class="aspect-video bg-slate-950 rounded overflow-hidden mb-2 relative">
+            <img src="reports/figures/quantile_prediction_intervals.png" alt="Quantile Prediction Intervals" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+          </div>
+          <div class="text-xs font-semibold text-white group-hover:text-sky-400">Quantile Regression (UQ)</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">P10/P50/P90 Interval Calibration & Width</div>
+        </a>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Interactive Logic -->
+  <script>
+    // Model Benchmark Metadata
+    const modelData = {
+      lightgbm: {
+        name: "LightGBM",
+        color: "#38bdf8",
+        overallRmse: 38.90,
+        overallMae: 28.95,
+        extremeRmse: 34.72,
+        r2: 0.91,
+        lag: "0 h",
+        predictFn: (act, t) => act * 0.96 + Math.sin(t * 0.4) * 8 + (Math.random() * 6 - 3)
+      },
+      xgboost: {
+        name: "XGBoost",
+        color: "#06b6d4",
+        overallRmse: 39.23,
+        overallMae: 29.14,
+        extremeRmse: 35.07,
+        r2: 0.90,
+        lag: "0 h",
+        predictFn: (act, t) => act * 0.95 + Math.cos(t * 0.4) * 9 + (Math.random() * 7 - 3.5)
+      },
+      lstm: {
+        name: "Attention-LSTM",
+        color: "#a855f7",
+        overallRmse: 45.21,
+        overallMae: 35.42,
+        extremeRmse: 41.79,
+        r2: 0.87,
+        lag: "0 h",
+        predictFn: (act, t) => act * 0.93 + Math.sin(t * 0.3) * 14 + (Math.random() * 10 - 5)
+      },
+      transformer: {
+        name: "Transformer",
+        color: "#ec4899",
+        overallRmse: 44.59,
+        overallMae: 33.44,
+        extremeRmse: 42.35,
+        r2: 0.88,
+        lag: "0 h",
+        predictFn: (act, t) => act * 0.94 + Math.sin(t * 0.35) * 12 + (Math.random() * 9 - 4.5)
+      },
+      persistence: {
+        name: "Pure Persistence (y_t)",
+        color: "#f43f5e",
+        overallRmse: 51.48,
+        overallMae: 36.74,
+        extremeRmse: 47.07,
+        r2: 0.83,
+        lag: "+24 h (Delayed)",
+        // Pure persistence shifted by 24h cycle
+        predictFn: (act, t, history) => (t >= 24 ? history[t - 24] : act)
+      },
+      weekly: {
+        name: "Seasonal Weekly Persistence",
+        color: "#e2e8f0",
+        overallRmse: 67.56,
+        overallMae: 50.30,
+        extremeRmse: 69.76,
+        r2: 0.71,
+        lag: "0 h (High Error)",
+        predictFn: (act, t) => act * 0.82 + Math.sin(t * 0.1) * 35 + (Math.random() * 20 - 10)
+      }
+    };
+
+    let activeModelKey = "lightgbm";
+
+    // Generate Ground Truth Synthetic 72h Timeline (Severe Episode)
+    const hours = 72;
+    const actualAQI = [];
+    for (let t = 0; t < hours; t++) {
+      // Base diurnal curve + major inversion peak around hour 30-48
+      const diurnal = 50 * Math.sin(2 * Math.PI * (t - 8) / 24);
+      const smogEpisode = 160 * Math.exp(-0.5 * Math.pow((t - 38) / 9.0, 2));
+      const val = Math.max(80, Math.min(480, 210 + diurnal + smogEpisode + Math.sin(t * 0.8) * 12));
+      actualAQI.push(Math.round(val));
+    }
+
+    function selectModel(key) {
+      activeModelKey = key;
+      const model = modelData[key];
+
+      // Update button styling
+      ['lightgbm', 'xgboost', 'lstm', 'transformer', 'persistence', 'weekly'].forEach(k => {
+        const btn = document.getElementById(`btn-${k}`);
+        if (k === key) {
+          btn.className = "px-3 py-1.5 rounded-md font-medium transition bg-sky-500 text-white shadow";
+        } else {
+          btn.className = "px-3 py-1.5 rounded-md font-medium transition text-slate-400 hover:text-white";
+        }
+      });
+
+      // Update scorecard
+      document.getElementById("legendModelName").textContent = `${model.name} Forecast (ŷ_{t+24})`;
+      document.getElementById("legendModelColor").style.backgroundColor = model.color;
+
+      document.getElementById("modelScorecard").innerHTML = `
+        <span>RMSE: <strong class="text-white">${model.overallRmse.toFixed(2)}</strong></span>
+        <span class="text-slate-600">|</span>
+        <span>Extreme RMSE: <strong class="text-amber-400">${model.extremeRmse.toFixed(2)}</strong></span>
+        <span class="text-slate-600">|</span>
+        <span>R²: <strong class="text-white">${model.r2.toFixed(2)}</strong></span>
+        <span class="text-slate-600">|</span>
+        <span>Phase Lag: <strong class="${model.lag.includes('Delayed') ? 'text-rose-400' : 'text-emerald-400'}">${model.lag}</strong></span>
+      `;
+
+      drawForecastChart();
+    }
+
+    function drawForecastChart() {
+      const canvas = document.getElementById("forecastCanvas");
+      const ctx = canvas.getContext("2d");
+
+      // Handle high-DPI displays
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const w = rect.width;
+      const h = rect.height;
+      const padL = 45;
+      const padR = 20;
+      const padT = 25;
+      const padB = 30;
+      const chartW = w - padL - padR;
+      const chartH = h - padT - padB;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Y-scale: 0 to 500
+      const minY = 0;
+      const maxY = 500;
+      const getY = (val) => padT + chartH - ((val - minY) / (maxY - minY)) * chartH;
+      const getX = (i) => padL + (i / (hours - 1)) * chartW;
+
+      // Draw Grid & Severity Tiers
+      const yTicks = [100, 200, 300, 400, 500];
+      ctx.strokeStyle = "#1e293b";
+      ctx.lineWidth = 1;
+      ctx.fillStyle = "#64748b";
+      ctx.font = "10px monospace";
+      ctx.textAlign = "right";
+
+      yTicks.forEach(tick => {
+        const y = getY(tick);
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(w - padR, y);
+        ctx.stroke();
+        ctx.fillText(tick, padL - 8, y + 3);
+      });
+
+      // Severe Threshold Line (300)
+      const y300 = getY(300);
+      ctx.strokeStyle = "rgba(239, 68, 68, 0.4)";
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(padL, y300);
+      ctx.lineTo(w - padR, y300);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(239, 68, 68, 0.7)";
+      ctx.fillText("Severe (300)", w - padR - 5, y300 - 5);
+
+      // Predictions & Uncertainty Bands
+      const currentModel = modelData[activeModelKey];
+      const preds = [];
+      const p10s = [];
+      const p90s = [];
+
+      for (let t = 0; t < hours; t++) {
+        const pred = currentModel.predictFn(actualAQI[t], t, actualAQI);
+        preds.push(pred);
+        const dynamicWidth = 25 + (actualAQI[t] > 280 ? (actualAQI[t] - 280) * 0.5 : 0);
+        p10s.push(Math.max(0, pred - dynamicWidth));
+        p90s.push(Math.min(500, pred + dynamicWidth * 1.1));
+      }
+
+      // 1. Draw 80% Prediction Interval Band
+      ctx.fillStyle = "rgba(168, 85, 247, 0.15)";
+      ctx.beginPath();
+      ctx.moveTo(getX(0), getY(p90s[0]));
+      for (let t = 1; t < hours; t++) {
+        ctx.lineTo(getX(t), getY(p90s[t]));
+      }
+      for (let t = hours - 1; t >= 0; t--) {
+        ctx.lineTo(getX(t), getY(p10s[t]));
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // 2. Draw Actual Ground Truth
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(getX(0), getY(actualAQI[0]));
+      for (let t = 1; t < hours; t++) {
+        ctx.lineTo(getX(t), getY(actualAQI[t]));
+      }
+      ctx.stroke();
+
+      // 3. Draw Model Prediction Line
+      ctx.strokeStyle = currentModel.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(getX(0), getY(preds[0]));
+      for (let t = 1; t < hours; t++) {
+        ctx.lineTo(getX(t), getY(preds[t]));
+      }
+      ctx.stroke();
+
+      // X-Axis Labels (Time)
+      ctx.fillStyle = "#64748b";
+      ctx.textAlign = "center";
+      for (let t = 0; t < hours; t += 12) {
+        ctx.fillText(`+${t}h`, getX(t), h - 10);
+      }
+    }
+
+    // CPCB Sub-Index Calculator Logic
+    const breakpoints = {
+      pm25: [[0, 30, 0, 50], [30.1, 60, 51, 100], [60.1, 90, 101, 200], [90.1, 120, 201, 300], [120.1, 250, 301, 400], [250.1, 500, 401, 500]],
+      pm10: [[0, 50, 0, 50], [50.1, 100, 51, 100], [100.1, 250, 101, 200], [250.1, 350, 201, 300], [350.1, 430, 301, 400], [430.1, 600, 401, 500]],
+      no2:  [[0, 40, 0, 50], [40.1, 80, 51, 100], [80.1, 180, 101, 200], [180.1, 280, 201, 300], [280.1, 400, 301, 400], [400.1, 600, 401, 500]],
+      co:   [[0, 1.0, 0, 50], [1.01, 2.0, 51, 100], [2.01, 10, 101, 200], [10.01, 17, 201, 300], [17.01, 34, 301, 400], [34.01, 50, 401, 500]],
+      o3:   [[0, 50, 0, 50], [50.1, 100, 51, 100], [100.1, 168, 101, 200], [168.1, 208, 201, 300], [208.1, 748, 301, 400], [748.1, 1000, 401, 500]]
+    };
+
+    function calcSubIndex(val, bpList) {
+      for (const [bLo, bHi, iLo, iHi] of bpList) {
+        if (val >= bLo && val <= bHi) {
+          return Math.round(iLo + ((iHi - iLo) / (bHi - bLo)) * (val - bLo));
+        }
+      }
+      if (val > bpList[bpList.length - 1][1]) return 500;
+      return 0;
+    }
+
+    function updateAQI() {
+      const p25 = parseFloat(document.getElementById("slider-pm25").value);
+      const p10 = parseFloat(document.getElementById("slider-pm10").value);
+      const no2 = parseFloat(document.getElementById("slider-no2").value);
+      const co  = parseFloat(document.getElementById("slider-co").value);
+      const o3  = parseFloat(document.getElementById("slider-o3").value);
+
+      document.getElementById("val-pm25").textContent = p25;
+      document.getElementById("val-pm10").textContent = p10;
+      document.getElementById("val-no2").textContent = no2;
+      document.getElementById("val-co").textContent = co;
+      document.getElementById("val-o3").textContent = o3;
+
+      const s25 = calcSubIndex(p25, breakpoints.pm25);
+      const s10 = calcSubIndex(p10, breakpoints.pm10);
+      const sno2 = calcSubIndex(no2, breakpoints.no2);
+      const sco = calcSubIndex(co, breakpoints.co);
+      const so3 = calcSubIndex(o3, breakpoints.o3);
+
+      document.getElementById("sub-pm25").textContent = s25;
+      document.getElementById("sub-pm10").textContent = s10;
+      document.getElementById("sub-no2").textContent = sno2;
+      document.getElementById("sub-co").textContent = sco;
+      document.getElementById("sub-o3").textContent = so3;
+
+      const subIndices = [
+        { name: "PM2.5", val: s25 },
+        { name: "PM10", val: s10 },
+        { name: "NO2", val: sno2 },
+        { name: "CO", val: sco },
+        { name: "O3", val: so3 }
+      ];
+
+      subIndices.sort((a, b) => b.val - a.val);
+      const dominant = subIndices[0];
+      const overallAQI = dominant.val;
+
+      document.getElementById("aqiTotalVal").textContent = overallAQI;
+      document.getElementById("dominantPollutant").textContent = dominant.name;
+
+      const badge = document.getElementById("aqiBadge");
+      const catVal = document.getElementById("aqiCategoryVal");
+
+      if (overallAQI <= 50) {
+        badge.className = "px-3 py-1.5 rounded-lg text-center font-bold text-sm bg-emerald-600 text-white shadow";
+        catVal.textContent = "Good";
+      } else if (overallAQI <= 100) {
+        badge.className = "px-3 py-1.5 rounded-lg text-center font-bold text-sm bg-green-500 text-white shadow";
+        catVal.textContent = "Satisfactory";
+      } else if (overallAQI <= 200) {
+        badge.className = "px-3 py-1.5 rounded-lg text-center font-bold text-sm bg-yellow-500 text-slate-900 shadow";
+        catVal.textContent = "Moderate";
+      } else if (overallAQI <= 300) {
+        badge.className = "px-3 py-1.5 rounded-lg text-center font-bold text-sm bg-orange-500 text-white shadow";
+        catVal.textContent = "Poor";
+      } else if (overallAQI <= 400) {
+        badge.className = "px-3 py-1.5 rounded-lg text-center font-bold text-sm bg-rose-600 text-white shadow";
+        catVal.textContent = "Very Poor";
+      } else {
+        badge.className = "px-3 py-1.5 rounded-lg text-center font-bold text-sm bg-red-800 text-white shadow";
+        catVal.textContent = "Severe";
+      }
+    }
+
+    // Initialize on Load
+    window.addEventListener("resize", drawForecastChart);
+    window.addEventListener("DOMContentLoaded", () => {
+      selectModel("lightgbm");
+      updateAQI();
+    });
+  </script>
+</body>
+</html>
